@@ -12,20 +12,20 @@ tests = [ "wait-bad-pid" , "wait-killed", "wait-simple", "wait-twice", "exec-mul
 
 Makefile = "Make.tests"
 
-if len(sys.argv) < 2:
+def usage():
     print "Usage: ./prepare <option> [testdir]"
-    print "<option>  : Required Argument. possible values : 'ch2' or 'ch3'"
+    print "<option>  : Required Argument. possible values : 'ch1' or 'ch2'"
     print "[testdir] : Optional Argument. location of test directory (src/tests/userprog) relative to current dir"
     print "                               default value - ../tests/userprog"
+
+if len(sys.argv) < 2:
+    usage()
     exit()
 
 option = sys.argv[1].strip()
-if option != "ch1" and option != "ch2" and option != "ch3":
+if option != "ch1" and option != "ch2":
     print "Wrong argument"
-    print "Usage: ./prepare <option> [testdir]"
-    print "<option>  : Required Argument. possible values : 'ch1' or 'ch2' or 'ch3'"
-    print "[testdir] : Optional Argument. location of test directory (src/tests/userprog) relative to current dir"
-    print "                               default value - ../tests/userprog"
+    usage()
     exit()
 
 if len(sys.argv) > 2:
@@ -45,14 +45,6 @@ if option == "ch1":
         shutil.copy2(dir_prefix + test + ".ck.ch1", dir_prefix + test + ".ck");
 
 if option == "ch2":
-    shutil.copy2(dir_prefix + Makefile + ".ch2", dir_prefix + Makefile)
-    shutil.copy2(dir_prefix + "../main.c.ch2", dir_prefix + "../main.c")
-    shutil.copy2(dir_prefix + "no-vm/" + Makefile + ".ch2", dir_prefix + "no-vm/" + Makefile)
-    shutil.copy2(dir_prefix + "../filesys/base/" + Makefile + ".ch2", dir_prefix + "../filesys/base/" + Makefile)
-    for test in tests:
-        shutil.copy2(dir_prefix + test + ".ck.ch2", dir_prefix + test + ".ck");
-
-if option == "ch3":
     shutil.copy2(dir_prefix + Makefile + ".orig", dir_prefix + Makefile)
     shutil.copy2(dir_prefix + "../main.c.orig", dir_prefix + "../main.c")
     shutil.copy2(dir_prefix + "no-vm/" + Makefile + ".orig", dir_prefix + "no-vm/" + Makefile )
