@@ -335,6 +335,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  /*
+    OUR CODE HERE
+  */
+
   thread_current ()->priority = new_priority;
 }
 
@@ -342,6 +346,10 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
+  /*
+    OUR CODE HERE
+  */
+
   return thread_current ()->priority;
 }
 
@@ -349,6 +357,9 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED) 
 {
+  /*
+    OUR CODE HERE
+  */
   /* Not yet implemented. */
 }
 
@@ -356,6 +367,9 @@ thread_set_nice (int nice UNUSED)
 int
 thread_get_nice (void) 
 {
+  /*
+    OUR CODE HERE
+  */
   /* Not yet implemented. */
   return 0;
 }
@@ -364,6 +378,9 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
+  /*
+    OUR CODE HERE
+  */
   /* Not yet implemented. */
   return 0;
 }
@@ -372,6 +389,9 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
+  /*
+    OUR CODE HERE
+  */
   /* Not yet implemented. */
   return 0;
 }
