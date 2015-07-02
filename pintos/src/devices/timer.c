@@ -91,7 +91,6 @@ timer_sleep (int64_t ticks)
 {
   struct thread *cur = thread_current ();
   cur->sleep_until_tick = timer_ticks () + ticks;
-  printf("T%d from % " PRId64 " for %" PRId64 " to %" PRId64 "\n", cur->tid, cur->sleep_until_tick-ticks, ticks, cur->sleep_until_tick);
   enum intr_level old_level = intr_disable();
   thread_timer_sleep (cur);
   intr_set_level (old_level);

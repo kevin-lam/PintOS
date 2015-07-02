@@ -183,7 +183,7 @@ thread_timer_wake (int64_t ticks)
       if (ticks < t->sleep_until_tick) {
         break;
       }
-      list_push_back (&ready_list, e);
+      list_push_back (&ready_list, &t->elem);
       list_remove (e);
       t->status = THREAD_READY; 
     }
