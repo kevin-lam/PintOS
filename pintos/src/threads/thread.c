@@ -561,8 +561,14 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else 
+  {
+    struct list_elem * max = list_max(&ready_list, 
+                                      thread_priority_comparison, NULL);
+    list_remove(max);
+    struct thread * t = list_entry(max, struct thread, elem);
+    return t;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -651,3 +657,22 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+bool thread_priority_comparison(const struct list_elem *a, 
+                               const struct list_elem *b, void *aux) {
+    const struct thread * threadA = list_entry(a, struct thread, elem);
+    const struct thread * threadB = list_entry(b, struct thread, elem);
+    ASSERT(PRI_MIN <= threadA->priority && threadA->priority <= PRI_MAX);
+    ASSERT(PRI_MIN <= threadB->priority && threadB->priority <= PRI_MAX);
+    return threadA->priority < threadB->priority;
+}
+
+
+
+
+
+
+
+
+
+
