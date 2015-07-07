@@ -159,16 +159,14 @@ timer_cmp_sleep (const struct list_elem *a,
 }
 
 /* Sleeps a thread that calls timer_sleep, then schedules a new thread.
-   Requires cur->sleep_until_tick to be set before calling. */
+   Requires cur->sleep_until_tick to be set before calling. 
+   Interrupts must be disabled before calling and disabled after. */
 void
 thread_timer_sleep (struct thread *cur)
 {
   list_insert_ordered (&sleep_list, &cur->sleepelem, timer_cmp_sleep, NULL);
-
-  enum intr_level old_level = intr_disable ();
   cur->status = THREAD_BLOCKED;
   schedule ();
-  intr_set_level (old_level);
 }
 
 /* Called in conjunction with thread_tick by the timer interrupt handler.
