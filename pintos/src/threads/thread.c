@@ -74,6 +74,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 static bool timer_cmp_sleep (const struct list_elem *a, const struct list_elem *b, void *aux);
+static bool thread_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -244,6 +245,8 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+ 
+  t->priority = priority;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -286,7 +289,9 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
-  intr_set_level (old_level);
+  intr_set_level(old_level);
+ // if (t->priority > thread_current ()->priority)
+   // thread_yield();
 }
 
 /* Returns the name of the running thread. */
@@ -385,8 +390,22 @@ thread_set_priority (int new_priority)
   /*
     OUR CODE HERE
   */
-
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  int original_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
+  if (new_priority < original_priority)
+  {
+    struct list_elem *max = list_max (&ready_list, thread_priority_cmp, NULL);
+    struct thread *t = list_entry(max, struct thread, elem);
+    int highest_priority = t->priority;
+    intr_set_level (old_level);
+    if (new_priority < highest_priority)
+      thread_yield();
+  }
+  else
+    intr_set_level (old_level);
+  
 }
 
 /* Returns the current thread's priority. */
@@ -575,8 +594,9 @@ next_thread_to_run (void)
   else 
   {
     struct list_elem *max = list_max (&ready_list, thread_priority_cmp, NULL);
+    struct thread *highest_priority_thread = list_entry (max, struct thread, elem);
     list_remove (max);
-    return list_entry (max, struct thread, elem);
+    return highest_priority_thread;
   }
 }
 
