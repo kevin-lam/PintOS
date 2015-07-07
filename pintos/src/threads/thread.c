@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* Queue of threads put to sleep by timer_sleep */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -70,6 +73,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+static bool timer_cmp_sleep (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -92,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -137,6 +142,50 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+}
+
+/* Comparison function for ordered insertion into the sleep quueue */
+static bool
+timer_cmp_sleep (const struct list_elem *a,
+                 const struct list_elem *b,
+                 void *aux)
+{
+  (void)aux;
+
+  struct thread *a_thread = list_entry(a, struct thread, sleepelem);
+  struct thread *b_thread = list_entry(b, struct thread, sleepelem);
+
+  return a_thread->sleep_until_tick < b_thread->sleep_until_tick;
+}
+
+/* Sleeps a thread that calls timer_sleep, then schedules a new thread.
+   Requires cur->sleep_until_tick to be set before calling. 
+   Interrupts must be disabled before calling and disabled after. */
+void
+thread_timer_sleep (struct thread *cur)
+{
+  list_insert_ordered (&sleep_list, &cur->sleepelem, timer_cmp_sleep, NULL);
+  cur->status = THREAD_BLOCKED;
+  schedule ();
+}
+
+/* Called in conjunction with thread_tick by the timer interrupt handler.
+   Checks if threads are ready to be woken from timer sleep at given tick. */
+void
+thread_timer_wake (int64_t ticks)
+{
+  if (!list_empty (&sleep_list)) {
+    struct list_elem *e;
+    for (e = list_begin (&sleep_list); e != list_tail (&sleep_list); e = list_next(e)) {  
+      struct thread *t = list_entry (e, struct thread, sleepelem);
+      if (ticks < t->sleep_until_tick) {
+        break;
+      }
+      list_push_back (&ready_list, &t->elem);
+      list_remove (e);
+      t->status = THREAD_READY; 
+    }
+  }
 }
 
 /* Prints thread statistics. */
