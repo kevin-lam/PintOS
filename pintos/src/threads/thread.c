@@ -250,6 +250,8 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  if (t->priority > thread_current()->priority) 
+    thread_yield();
 
   return tid;
 }
@@ -394,7 +396,7 @@ thread_set_priority (int new_priority)
   old_level = intr_disable ();
   int original_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
-  if (new_priority < original_priority)
+  if (new_priority < original_priority && !list_empty(&ready_list))
   {
     struct list_elem *max = list_max (&ready_list, thread_priority_cmp, NULL);
     struct thread *t = list_entry(max, struct thread, elem);
