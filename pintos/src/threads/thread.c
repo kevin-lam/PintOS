@@ -146,14 +146,12 @@ thread_tick (void)
 
 /* Comparison function for ordered insertion into the sleep quueue */
 static bool
-timer_cmp_sleep (const struct list_elem *a,
-                 const struct list_elem *b,
-                 void *aux)
+timer_cmp_sleep (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
   (void)aux;
 
-  struct thread *a_thread = list_entry(a, struct thread, sleepelem);
-  struct thread *b_thread = list_entry(b, struct thread, sleepelem);
+  const struct thread *a_thread = list_entry (a, struct thread, sleepelem);
+  const struct thread *b_thread = list_entry (b, struct thread, sleepelem);
 
   return a_thread->sleep_until_tick < b_thread->sleep_until_tick;
 }
@@ -551,6 +549,19 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+/* Comparison function used to get highest priority thread from ready_list */
+static bool
+thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+    (void)aux;
+
+    const struct thread *threadA = list_entry (a, struct thread, elem);
+    const struct thread *threadB = list_entry (b, struct thread, elem);
+    ASSERT (PRI_MIN <= threadA->priority && threadA->priority <= PRI_MAX);
+    ASSERT (PRI_MIN <= threadB->priority && threadB->priority <= PRI_MAX);
+    return threadA->priority < threadB->priority;
+}
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -563,11 +574,9 @@ next_thread_to_run (void)
     return idle_thread;
   else 
   {
-    struct list_elem * max = list_max(&ready_list, 
-                                      thread_priority_comparison, NULL);
-    list_remove(max);
-    struct thread * t = list_entry(max, struct thread, elem);
-    return t;
+    struct list_elem *max = list_max (&ready_list, thread_priority_cmp, NULL);
+    list_remove (max);
+    return list_entry (max, struct thread, elem);
   }
 }
 
@@ -653,26 +662,8 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-bool thread_priority_comparison(const struct list_elem *a, 
-                               const struct list_elem *b, void *aux) {
-    const struct thread * threadA = list_entry(a, struct thread, elem);
-    const struct thread * threadB = list_entry(b, struct thread, elem);
-    ASSERT(PRI_MIN <= threadA->priority && threadA->priority <= PRI_MAX);
-    ASSERT(PRI_MIN <= threadB->priority && threadB->priority <= PRI_MAX);
-    return threadA->priority < threadB->priority;
-}
-
-
-
-
-
-
-
-
-
 
