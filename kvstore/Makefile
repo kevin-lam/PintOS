@@ -48,13 +48,12 @@ json: $(JSON_C_DIR)/Makefile
 
 $(JSON_C_DIR)/Makefile:
 	git submodule update --init
-	cd ./lib/json-c; ./configure --prefix=`pwd`
+	cd ./lib/json-c; autoreconf; ./configure --prefix=`pwd`
 skeleton:
 	./create_skeleton
 clean:
 	rm -rf $(BIN) tests/*.o *.pyc test_tmp_dir
 	$(MAKE) -C src/server clean
-	cd lib/json-c; ./autogen.sh
 	$(MAKE) -C lib/json-c clean
 
 .PHONY: all clean check json-c json-c-make
