@@ -44,11 +44,12 @@ check: test
 	./$(TESTEXE)
 
 json: $(JSON_C_DIR)/Makefile
+	cd ./lib/json-c; autoreconf
 	make -C ./lib/json-c install
 
 $(JSON_C_DIR)/Makefile:
 	git submodule update --init
-	cd ./lib/json-c; ./configure --prefix=`pwd`
+	cd ./lib/json-c; autoreconf; ./configure --prefix=`pwd`
 skeleton:
 	./create_skeleton
 clean:
