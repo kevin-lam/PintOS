@@ -54,6 +54,7 @@ skeleton:
 clean:
 	rm -rf $(BIN) tests/*.o *.pyc test_tmp_dir
 	$(MAKE) -C src/server clean
+	cd lib/json-c; ./autogen.sh
 	$(MAKE) -C lib/json-c clean
 
 .PHONY: all clean check json-c json-c-make
