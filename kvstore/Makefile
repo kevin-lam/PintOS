@@ -44,6 +44,7 @@ check: test
 	./$(TESTEXE)
 
 json: $(JSON_C_DIR)/Makefile
+	cd ./lib/json-c; autoreconf
 	make -C ./lib/json-c install
 
 $(JSON_C_DIR)/Makefile:
