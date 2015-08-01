@@ -11,6 +11,10 @@
 #include <stdio.h>
 
 static void kvcacheset_evict(kvcacheset_t *cacheset, struct kvcacheentry *entry);
+static bool key_in_cacheset(kvcacheset_t *cacheset, char * key);
+static void change_entry_value(kvcacheset_t *cacheset, char * key, char * new_value);
+static struct kvcacheentry * create_kvcacheentry(char * key, char * value);
+static bool kvcacheset_at_capacity(kvcacheset_t *cacheset);
 
 /* Initializes CACHESET to hold a maximum of ELEM_PER_SET elements.
  * ELEM_PER_SET must be at least 2.
@@ -35,6 +39,9 @@ int kvcacheset_init(kvcacheset_t *cacheset, unsigned int elem_per_set) {
 int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
   assert(cacheset);
   assert(key);
+  if (strlen(key) >= MAX_KEYLEN) {
+    return ERRKEYLEN;
+  }
   struct kvcacheentry * entry;
   HASH_FIND_STR(cacheset->entries, key, entry);
   if (NULL == entry) {
@@ -43,7 +50,6 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
   entry->refbit = true;
   *value = malloc(strlen(entry->value) + 1);
   if (NULL == *value) {
-    // better error message?
     return -1;
   }
   strcpy(*value, entry->value);
@@ -54,56 +60,32 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
  * returns a negative error code. Should evict elements if necessary to not
  * exceed CACHESET->elem_per_set total entries. */
 int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
+
+  // I HAVE NOT IMPLEMENTED THE LOCK YET
+
   assert(cacheset);
   assert(key);
   assert(value);
+  if (strlen(key) >= MAX_KEYLEN) {
+    return ERRKEYLEN;
+  }
+  if (strlen(value) >= MAX_VALLEN) {
+    return ERRVALLEN;
+  }
 
-  // if the entry is present then we modify it
-  struct kvcacheentry *tmp;
-  HASH_FIND_STR(cacheset->entries, key, tmp);
-  if (NULL != tmp) {
-    free(tmp->value);
-    tmp->value = malloc(strlen(value) + 1);
-    if (NULL == tmp->value) {
-      // some error code?
-      return -1;
-    }
-    strcpy(tmp->value, value);
+  if (key_in_cacheset(cacheset, key)) {
+    change_entry_value(cacheset, key, value);
     return 0;
   }
 
-  // the entry is not present, so we create one
-  struct kvcacheentry * entry = malloc(sizeof(struct kvcacheentry));
-  if (NULL == entry) {
-    // should look into macros for error code
-    return -1;
-  }
-  entry->key = malloc(sizeof(char) * strlen(key) + 1);
-  if (NULL == entry->key) {
-    // should look into macros for error code
-    return -1;
-  }
-  strcpy(entry->key, key);
+  struct kvcacheentry * entry = create_kvcacheentry(key, value);
+  assert(NULL != entry);
 
-  entry->value = malloc(sizeof(char) * strlen(value) + 1);
-  if (NULL == entry->value) {
-    // should look into macros for error code
-    return -1;
-  }
-  strcpy(entry->value, value);
-  entry->refbit = false;
-  entry->id = hash(key);
-
-  // do we need to evict an item?
-  if (cacheset->num_entries == cacheset->elem_per_set) {
+  if (kvcacheset_at_capacity(cacheset)) {
     kvcacheset_evict(cacheset, entry); 
   }
 
   DL_APPEND(cacheset->eviction_queue, entry);
-
-  // I have not implemented the lock yet
-
-  // see: https://troydhanson.github.io/uthash/userguide.html
   HASH_ADD_KEYPTR(hh, cacheset->entries, entry->key, strlen(entry->key), entry);
   cacheset->num_entries++;
 
@@ -114,22 +96,20 @@ static void
 kvcacheset_evict(kvcacheset_t *cacheset, struct kvcacheentry *entry) {
   assert(cacheset);
   assert(entry);
-  // do something
   struct kvcacheentry * victim = NULL;
   struct kvcacheentry * tmp = NULL;
   victim = cacheset->entries;
   while (1) {
     if (NULL == victim) {
-      // panic
-      printf("our victim is null\n");
+      printf("We couldn't find a victim to evict due to an error.\n");
       return;
     }
     if (!victim->refbit) {
       break;
     }
+    victim->refbit = false;
     tmp = victim;
     victim = victim->next;
-    tmp->refbit = false;
     DL_DELETE(cacheset->entries, tmp);
     DL_APPEND(cacheset->entries, tmp);
   }
@@ -142,6 +122,10 @@ kvcacheset_evict(kvcacheset_t *cacheset, struct kvcacheentry *entry) {
 int kvcacheset_del(kvcacheset_t *cacheset, char *key) {
   assert(cacheset);
   assert(key);
+  if (strlen(key) >= MAX_KEYLEN) {
+    return ERRKEYLEN;
+  }
+
   struct kvcacheentry * entry;
   HASH_FIND_STR(cacheset->entries, key, entry);
   if (NULL == entry) {
@@ -171,4 +155,49 @@ void kvcacheset_clear(kvcacheset_t *cacheset) {
     free(current_entry);        
   }
   cacheset->num_entries = 0;
+}
+
+static bool 
+key_in_cacheset(kvcacheset_t *cacheset, char * key) {
+  struct kvcacheentry *tmp;
+  HASH_FIND_STR(cacheset->entries, key, tmp);
+  return (NULL != tmp);
+}
+
+static void 
+change_entry_value(kvcacheset_t *cacheset, char * key, char * new_value) {
+  struct kvcacheentry *tmp;
+  HASH_FIND_STR(cacheset->entries, key, tmp);
+  assert(tmp);
+  free(tmp->value);
+  tmp->value = malloc(strlen(new_value) + 1);
+  strcpy(tmp->value, new_value);
+}
+
+static struct kvcacheentry *
+create_kvcacheentry(char * key, char * value) {
+  struct kvcacheentry * entry = malloc(sizeof(struct kvcacheentry));
+  if (NULL == entry) {
+    return NULL;
+  }
+  entry->key = malloc(sizeof(char) * strlen(key) + 1);
+  if (NULL == entry->key) {
+    return NULL;
+  }
+  strcpy(entry->key, key);
+
+  entry->value = malloc(sizeof(char) * strlen(value) + 1);
+  if (NULL == entry->value) {
+    return NULL;
+  }
+  strcpy(entry->value, value);
+  entry->refbit = false;
+  entry->id = hash(key);
+  return entry;
+}
+
+static bool 
+kvcacheset_at_capacity(kvcacheset_t *cacheset) {
+  assert(cacheset);
+  return cacheset->num_entries == cacheset->elem_per_set;
 }
