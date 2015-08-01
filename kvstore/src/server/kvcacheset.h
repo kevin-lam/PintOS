@@ -22,6 +22,8 @@ struct kvcacheentry {
   char *key;                      /* The entry's key. */
   char *value;                    /* The entry's value. */
   bool refbit;                    /* Used to determine if this entry has been used. */
+  unsigned long id;
+  UT_hash_handle hh;
 };
 
 /* A KVCacheSet. */
@@ -29,6 +31,7 @@ typedef struct {
   unsigned int elem_per_set;      /* The max number of elements which can be stored in this set. */
   pthread_rwlock_t lock;          /* The lock which can be used to lock this set. */
   int num_entries;                /* The current number of entries in this set. */
+  struct kvcacheentry *entries;   /* For UTHash */
 } kvcacheset_t;
 
 int kvcacheset_init(kvcacheset_t *, unsigned int elem_per_set);
