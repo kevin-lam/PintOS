@@ -54,31 +54,28 @@ int kvserver_register_master(kvserver_t *server, int sockfd) {
  * be free()d.  If the KEY is in cache, take the value from there. Otherwise,
  * go to the store and update the value in the cache. */
 int kvserver_get(kvserver_t *server, char *key, char **value) {
-  printf("Calling kvserver_get\n");
   assert(server);
   assert(key);
   assert(value);
   int error;
-  printf("Calling kvcache_get\n");
   error = kvcache_get(&server->cache, key, value);
-  if (error != ERRNOKEY) return error;
-  if (!(error = kvstore_get(&server->store, key, value))) {
-    printf("Calling kvcache_put\n");
+  if (error != ERRNOKEY) {
+    return error;
+  }
+  error = kvstore_get(&server->store, key, value);
+  if (!error) {
     kvcache_put(&server->cache, key, *value);
   } 
-  printf("Finished kvserver_get\n");
   return error;
 }
 
 /* Checks if the given KEY, VALUE pair can be inserted into this server's
  * store. Returns 0 if it can, else a negative error code. */
 int kvserver_put_check(kvserver_t *server, char *key, char *value) {
-  printf("Calling kvserver_put_check\n");
   assert(server);
   assert(key);
   assert(value);
   int error = kvstore_put_check(&server->store, key, value);
-  printf("Finished kvserver_put_check\n");
   return error;
 }
 
@@ -86,8 +83,6 @@ int kvserver_put_check(kvserver_t *server, char *key, char *value) {
  * to the cache should be concurrent if the keys are in different cache sets.
  * Returns 0 if successful, else a negative error code. */
 int kvserver_put(kvserver_t *server, char *key, char *value) {
-  printf("Calling kvserver_put\n");
-  // currently i'm only implementing the cache side
   assert(server);
   assert(key);
   assert(value);
@@ -97,18 +92,15 @@ int kvserver_put(kvserver_t *server, char *key, char *value) {
     return error;
   }
   error = kvstore_put(&server->store, key, value);
-  printf("Finished kvserver_put\n");
   return error;
 }
 
 /* Checks if the given KEY can be deleted from this server's store.
  * Returns 0 if it can, else a negative error code. */
 int kvserver_del_check(kvserver_t *server, char *key) {
-  printf("Calling kvserver_del_check\n");
   assert(server);
   assert(key);
   int error = kvstore_del_check(&server->store, key);
-  printf("Finished kvserver_del_check\n");
   return error;
 }
 
@@ -116,14 +108,12 @@ int kvserver_del_check(kvserver_t *server, char *key) {
  * cache should be concurrent if the keys are in different cache sets. Returns
  * 0 if successful, else a negative error code. */
 int kvserver_del(kvserver_t *server, char *key) {
-  printf("Calling kvserver_del\n");
   assert(server);
   assert(key);
   int error;
   error = kvcache_del(&server->cache, key);
   if (error != 0 && error != ERRNOKEY) return error;
   error = kvstore_del(&server->store, key);
-  printf("Finished kvserver_del\n");
   return error;
 }
 
@@ -159,42 +149,44 @@ void kvserver_handle_tpc(kvserver_t *server, kvmessage_t *reqmsg,
  * message. See the spec for details on logic and error messages. */
 void kvserver_handle_no_tpc(kvserver_t *server, kvmessage_t *reqmsg,
     kvmessage_t *respmsg) {
-  printf("Calling kvserver_handle_no_tpc\n");
-  // do i need to allocate memory for the response???
   int error = 0;
   char * key = reqmsg->key;
   char * value = reqmsg->value;
-  respmsg->type = RESP;
   switch (reqmsg->type) {
     case GETREQ:
       error = kvserver_get(server, key, &respmsg->value);
-      respmsg->key = key;
+      respmsg->key = key; // allocate memory?
+      if (!error) {
+        // GETRESP is for a successful response
+        respmsg->type = GETRESP;      
+      } else {
+        respmsg->type = RESP;      
+      }
       break;
     case PUTREQ:
-      // something is wrong with kvserver_put_check
-      // if I bypass that check then 5 additional tests will
-      // pass.
-      error = kvserver_put(server, key, value);
-      /*
       error = kvserver_put_check(server, key, value);
       if (!error) {
         error = kvserver_put(server, key, value);
       }
-      */
+      respmsg->type = RESP;
       break;
     case DELREQ:
       error = kvserver_del_check(server, key);
       if (!error) {
         error = kvserver_del(server, key);
       }
+      respmsg->type = RESP;
       break;
     case GETRESP:
       // what's this for?
+      respmsg->type = RESP;
       break;
     case INFO:
       respmsg->message = kvserver_get_info_message(server);
+      respmsg->type = INFO;
       break;
     default:
+      respmsg->type = RESP;
       break;
   }
   if (error) {
@@ -202,8 +194,6 @@ void kvserver_handle_no_tpc(kvserver_t *server, kvmessage_t *reqmsg,
   } else {
     respmsg->message = MSG_SUCCESS;
   }
-  //respmsg->message = ERRMSG_NOT_IMPLEMENTED;
-  printf("Finished kvserver_handle_no_tpc\n");
 }
 
 /* Generic entrypoint for this SERVER. Takes in a socket on SOCKFD, which
@@ -211,7 +201,6 @@ void kvserver_handle_no_tpc(kvserver_t *server, kvmessage_t *reqmsg,
  * and sends back a response message.  This should call out to the appropriate
  * internal handler. */
 void kvserver_handle(kvserver_t *server, int sockfd, void *extra) {
-  printf("Calling kvserver_handle\n");
   kvmessage_t *reqmsg, *respmsg;
   respmsg = calloc(1, sizeof(kvmessage_t));
   reqmsg = kvmessage_parse(sockfd);
