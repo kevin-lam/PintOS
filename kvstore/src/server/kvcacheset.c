@@ -43,7 +43,9 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
     return ERRKEYLEN;
   }
   struct kvcacheentry * entry;
+  pthread_rwlock_rdlock(&cacheset->lock);
   HASH_FIND_STR(cacheset->entries, key, entry);
+  pthread_rwlock_unlock(&cacheset->lock);
   if (NULL == entry) {
     return ERRNOKEY;
   }
@@ -60,9 +62,6 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
  * returns a negative error code. Should evict elements if necessary to not
  * exceed CACHESET->elem_per_set total entries. */
 int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
-
-  // I HAVE NOT IMPLEMENTED THE LOCK YET
-
   assert(cacheset);
   assert(key);
   assert(value);
@@ -73,8 +72,10 @@ int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
     return ERRVALLEN;
   }
 
+  pthread_rwlock_wrlock(&cacheset->lock);
   if (key_in_cacheset(cacheset, key)) {
     change_entry_value(cacheset, key, value);
+    pthread_rwlock_unlock(&cacheset->lock);
     return 0;
   }
 
@@ -88,6 +89,7 @@ int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
   DL_APPEND(cacheset->eviction_queue, entry);
   HASH_ADD_KEYPTR(hh, cacheset->entries, entry->key, strlen(entry->key), entry);
   cacheset->num_entries++;
+  pthread_rwlock_unlock(&cacheset->lock);
 
   return 0;
 }
@@ -126,6 +128,7 @@ int kvcacheset_del(kvcacheset_t *cacheset, char *key) {
     return ERRKEYLEN;
   }
 
+  pthread_rwlock_wrlock(&cacheset->lock);
   struct kvcacheentry * entry;
   HASH_FIND_STR(cacheset->entries, key, entry);
   if (NULL == entry) {
@@ -137,6 +140,7 @@ int kvcacheset_del(kvcacheset_t *cacheset, char *key) {
   free(entry->value);
   free(entry);
   cacheset->num_entries--;
+  pthread_rwlock_unlock(&cacheset->lock);
   return 0;
 }
 
@@ -145,6 +149,7 @@ void kvcacheset_clear(kvcacheset_t *cacheset) {
   assert(cacheset);
   struct kvcacheentry * current_entry = NULL;
   struct kvcacheentry * tmp = NULL;
+  pthread_rwlock_wrlock(&cacheset->lock);
   DL_FOREACH_SAFE(cacheset->eviction_queue, current_entry, tmp) {
     DL_DELETE(cacheset->eviction_queue, current_entry);
   }
@@ -155,6 +160,8 @@ void kvcacheset_clear(kvcacheset_t *cacheset) {
     free(current_entry);        
   }
   cacheset->num_entries = 0;
+  pthread_rwlock_unlock(&cacheset->lock);
+  pthread_rwlock_destroy(&cacheset->lock);
 }
 
 static bool 
@@ -166,6 +173,7 @@ key_in_cacheset(kvcacheset_t *cacheset, char * key) {
 
 static void 
 change_entry_value(kvcacheset_t *cacheset, char * key, char * new_value) {
+  // maybe tmp isn't the best name...
   struct kvcacheentry *tmp;
   HASH_FIND_STR(cacheset->entries, key, tmp);
   assert(tmp);
