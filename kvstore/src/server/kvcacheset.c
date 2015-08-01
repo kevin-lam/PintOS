@@ -35,8 +35,7 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
   struct kvcacheentry * entry;
   HASH_FIND_STR(cacheset->entries, key, entry);
   if (NULL == entry) {
-    // better error code?
-    return -1;
+    return ERRNOKEY;
   }
   *value = entry->value;
   return 0;
@@ -46,6 +45,9 @@ int kvcacheset_get(kvcacheset_t *cacheset, char *key, char **value) {
  * returns a negative error code. Should evict elements if necessary to not
  * exceed CACHESET->elem_per_set total entries. */
 int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
+  assert(cacheset);
+  assert(key);
+  assert(value);
   // create hash entry
   // insert hash entry into table.
   struct kvcacheentry * entry = malloc(sizeof(struct kvcacheentry));
@@ -88,9 +90,29 @@ int kvcacheset_put(kvcacheset_t *cacheset, char *key, char *value) {
 /* Deletes the entry corresponding to KEY from CACHESET. Returns 0 if
  * successful, else returns a negative error code. */
 int kvcacheset_del(kvcacheset_t *cacheset, char *key) {
-  return -1;
+  assert(cacheset);
+  assert(key);
+  struct kvcacheentry * entry;
+  HASH_FIND_STR(cacheset->entries, key, entry);
+  if (NULL == entry) {
+    return ERRNOKEY;
+  }
+  HASH_DEL(cacheset->entries, entry);
+  free(entry->key);
+  free(entry->value);
+  free(entry);
+  return 0;
 }
 
 /* Completely clears this cache set. For testing purposes. */
 void kvcacheset_clear(kvcacheset_t *cacheset) {
+  assert(cacheset);
+  struct kvcacheentry * current_entry = NULL;
+  struct kvcacheentry * tmp = NULL;
+  HASH_ITER(hh, cacheset->entries, current_entry, tmp) {
+    HASH_DEL(cacheset->entries,current_entry);  
+    free(current_entry->key);     
+    free(current_entry->value);  
+    free(current_entry);        
+  }
 }
