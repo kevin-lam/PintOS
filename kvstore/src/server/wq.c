@@ -6,6 +6,9 @@
 /* Initializes a work queue WQ. Sets up any necessary synchronization constructs. */
 void wq_init(wq_t *wq) {
   wq->head = NULL;
+  pthread_mutex_init(&wq->mutex, NULL);
+  pthread_cond_init(&wq->cond, NULL);
+  wq->count = 0;
 }
 
 /* Remove an item from the WQ. Currently, this immediately attempts
@@ -16,11 +19,15 @@ void wq_init(wq_t *wq) {
  * contains at least one item, then remove that item from the list and
  * return it. */
 void *wq_pop(wq_t *wq) {
+  pthread_mutex_lock(&wq->mutex);
   void *job;
-  if (wq->head == NULL)
-    return NULL;
+  while(0 == wq->count) {
+    pthread_cond_wait(&wq->cond, &wq->mutex);
+  }
   job = wq->head->item;
   DL_DELETE(wq->head,wq->head);
+  wq->count--;
+  pthread_mutex_unlock(&wq->mutex);
   return job;
 }
 
@@ -29,7 +36,11 @@ void *wq_pop(wq_t *wq) {
  * It is your task to perform any necessary operations to properly
  * perform synchronization. */
 void wq_push(wq_t *wq, void *item) {
+  pthread_mutex_lock(&wq->mutex);
   wq_item_t *wq_item = calloc(1, sizeof(wq_item_t));
   wq_item->item = item;
   DL_APPEND(wq->head, wq_item);
+  wq->count++;
+  pthread_cond_signal(&wq->cond);
+  pthread_mutex_unlock(&wq->mutex);
 }

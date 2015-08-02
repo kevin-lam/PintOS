@@ -5,12 +5,15 @@
 #include "kvconstants.h"
 #include "kvcache.h"
 #include "kvstore.h"
+#include <assert.h>
+#include <stdio.h>
 
 /* Initializes KVCache CACHE. The cache will contains NUM_SETS KVCacheSets,
  * each containing up to ELEM_PER_SET entries. Returns 0 if successful, else a
  * negative error code. */
 int kvcache_init(kvcache_t *cache, unsigned int num_sets,
     unsigned int elem_per_set) {
+  assert(cache);
   int i;
   if (num_sets == 0 || elem_per_set == 0)
     return -1;
@@ -30,13 +33,19 @@ int kvcache_init(kvcache_t *cache, unsigned int num_sets,
  * determined based on the hash of the KEY using the hash() function defined
  * within kvstore.h. */
 kvcacheset_t *get_cache_set(kvcache_t *cache, char *key) {
-  return &cache->sets[0];
+  assert(cache);
+  assert(key);
+  int index = hash(key) % cache->num_sets;
+  return &cache->sets[index];
 }
 
 /* Attempts to retrieve KEY from CACHE. If successful, returns 0 and stores the
  * associated value inside VALUE using malloc()d memory which should be free()d
  * later. Otherwise, returns a negative error code. */
 int kvcache_get(kvcache_t *cache, char *key, char **value) {
+  assert(cache);
+  assert(key);
+  assert(value);
   if (strlen(key) > MAX_KEYLEN)
     return ERRKEYLEN;
   return kvcacheset_get(get_cache_set(cache, key), key, value);
@@ -45,6 +54,9 @@ int kvcache_get(kvcache_t *cache, char *key, char **value) {
 /* Attempts to place the given KEY, VALUE entry into CACHE. Returns 0 if
  * successful, else a negative error code. */
 int kvcache_put(kvcache_t *cache, char *key, char *value) {
+  assert(cache);
+  assert(key);
+  assert(value);
   if (strlen(key) > MAX_KEYLEN)
     return ERRKEYLEN;
   if (strlen(value) > MAX_VALLEN)
@@ -55,6 +67,8 @@ int kvcache_put(kvcache_t *cache, char *key, char *value) {
 /* Attempts to delete the given KEY from CACHE. Returns 0 if successful, else a
  * negative error code. */
 int kvcache_del(kvcache_t *cache, char *key) {
+  assert(cache);
+  assert(key);
   if (strlen(key) > MAX_KEYLEN)
     return ERRKEYLEN;
   return kvcacheset_del(get_cache_set(cache, key), key);
@@ -63,6 +77,8 @@ int kvcache_del(kvcache_t *cache, char *key) {
 /* Returns the read-write lock associated with a given KEY within CACHE. Each
  * cache set has a separate lock. */
 pthread_rwlock_t *kvcache_getlock(kvcache_t *cache, char *key) {
+  assert(cache);
+  assert(key);
   if (strlen(key) > MAX_KEYLEN)
     return NULL;
   return &get_cache_set(cache, key)->lock;
@@ -70,6 +86,7 @@ pthread_rwlock_t *kvcache_getlock(kvcache_t *cache, char *key) {
 
 /* Completely clears this cache. For testing purposes. */
 void kvcache_clear(kvcache_t *cache) {
+  assert(cache);
   for (int i = 0; i < cache->num_sets; i++)
     kvcacheset_clear(&cache->sets[i]);
 }

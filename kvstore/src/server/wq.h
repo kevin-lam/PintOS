@@ -19,6 +19,9 @@ typedef struct wq_item {
 
 typedef struct wq {
   wq_item_t *head;         /* The head of the list of items. */
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  int count;
 } wq_t;
 
 

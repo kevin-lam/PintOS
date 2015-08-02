@@ -17,8 +17,23 @@
 #include "kvconstants.h"
 #include "socket_server.h"
 #include "wq.h"
+#include <assert.h>
 
 #define TIMEOUT 100
+
+void *thread_handle(void* aux) {
+    server_t * server = (server_t *)aux;
+    threadpool_t *tp = &server->threadpool;
+    while (1) {
+      pthread_mutex_lock(&tp->mutex);
+      while (0 == tp->num_jobs) {
+        pthread_cond_wait(&tp->cond, &tp->mutex);
+      }
+      tp->num_jobs--;
+      pthread_mutex_unlock(&tp->mutex);
+      handle(server);
+    }
+}
 
 /* Handles requests under the assumption that SERVER is a TPC Master. */
 void handle_master(server_t *server) {
@@ -129,13 +144,17 @@ int server_run(const char *hostname, int port, server_t *server,
     callback(NULL);
   }
 
+  threadpool_init(server);
 
   while (server->listening) {
     client_sock = accept(sock_fd, (struct sockaddr *) &client_address,
         (socklen_t *) &client_address_length);
     if (client_sock > 0) {
       wq_push(&server->wq, (void *) (intptr_t) client_sock);
-      handle(server);
+      pthread_mutex_lock(&server->threadpool.mutex);
+      server->threadpool.num_jobs++;
+      pthread_cond_signal(&server->threadpool.cond);
+      pthread_mutex_unlock(&server->threadpool.mutex);
     }
   }
   shutdown(sock_fd, SHUT_RDWR);
@@ -148,4 +167,18 @@ void server_stop(server_t *server) {
   server->listening = 0;
   shutdown(server->sockfd, SHUT_RDWR);
   close(server->sockfd);
+}
+
+void 
+threadpool_init(server_t *server) {
+    assert(server);
+    threadpool_t *tp = &server->threadpool;
+    pthread_mutex_init(&tp->mutex, NULL);
+    pthread_cond_init(&tp->cond, NULL);
+    tp->num_jobs = 0;
+    tp->threads = malloc(sizeof(pthread_t) * server->max_threads);
+    int i;
+    for (i = 0; i < server->max_threads; i++) {
+      pthread_create(&tp->threads[i], NULL, thread_handle, server);
+    }
 }

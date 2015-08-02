@@ -19,6 +19,13 @@
 
 void *handle(void *_kvserver);
 
+typedef struct threadpool {
+  int num_jobs;
+  pthread_t *threads;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+} threadpool_t;
+
 typedef struct server {
   int master;               /* 1 if this server represents a TPC Master, else 0. */
   int listening;            /* 1 if this server is currently listening, else 0. */
@@ -31,11 +38,13 @@ typedef struct server {
     kvserver_t kvserver;
     tpcmaster_t tpcmaster;
   };
+  threadpool_t threadpool;
 } server_t;
 
 int connect_to(const char *host, int port, int timeout);
 int server_run(const char *hostname, int port, server_t *server,
     callback_t callback);
 void server_stop(server_t *server);
+void threadpool_init(server_t *server);
 
 #endif
